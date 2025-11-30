@@ -4,26 +4,32 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set-image.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (for multi-arch) and Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to ACR
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.ACR_NAME }}.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }} # optional if using service principal
-          password: ${{ secrets.ACR_PASSWORD }}
+        run: az acr login --name ${{ secrets.ACR_NAME }}
 
-      - name: Build and push Docker image
+      - name: Set up QEMU and buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image to ACR
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -31,23 +37,20 @@ jobs:
           tags: ${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}
 
       - name: Set image tag output
-        id: image
-        run: echo "IMAGE=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
+        id: set-image
+        run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy-to-appservice:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Azure Login
+      - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Configure App Service to use container image
+      - name: Deploy container to App Service
         uses: azure/webapps-container-deploy@v2
         with:
           app-name: ${{ secrets.WEBAPP_NAME }}
-          images: ${{ needs.build-and-push.outputs.IMAGE }}
+          images: ${{ needs.build-and-push.outputs.image }}
