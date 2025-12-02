@@ -47,8 +47,9 @@ jobs:
 
       - name: Set image tag output
         id: set-image
-        run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
-
+        run: |
+          IMAGE_TAG="${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}"
+          echo "image=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   deploy-to-appservice:
     needs: build-and-push
@@ -76,7 +77,7 @@ jobs:
           ACR_USER: ${{ secrets.ACR_USERNAME }}
           ACR_PASS: ${{ secrets.ACR_PASSWORD }}
         run: |
-          echo "Deploying container with proper credentials"
+          echo "Deploying container to Azure Web App"
 
           az webapp config container set \
             --resource-group Hareesh_learning \
