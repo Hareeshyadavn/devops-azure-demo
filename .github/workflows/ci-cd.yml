@@ -68,20 +68,6 @@ jobs:
             --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
-      - name: Debug: Test ACR login and image existence
-        env:
-          IMAGE: ${{ needs.build-and-push.outputs.image }}
-          LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
-          ACR_USER: ${{ secrets.ACR_USERNAME }}
-          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
-        run: |
-          echo "Testing ACR login with secrets..."
-          echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
-          echo "Listing images in ACR..."
-          az acr repository list --name ${{ secrets.ACR_NAME }} --output table
-          echo "Checking if the built image exists..."
-          docker pull "$IMAGE"
-
       - name: Deploy container to Azure Web App
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
@@ -98,4 +84,19 @@ jobs:
             --container-registry-user "$ACR_USER" \
             --container-registry-password "$ACR_PASS"
 
+          echo "Restarting Web App..."
           az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
+
+      - name: Debug: Test ACR login and image existence
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+          ACR_USER: ${{ secrets.ACR_USERNAME }}
+          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          echo "Testing ACR login with secrets..."
+          echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
+          echo "Listing repositories in ACR..."
+          az acr repository list --name ${{ secrets.ACR_NAME }} --output table
+          echo "Pulling the built image..."
+          docker pull "$IMAGE"
