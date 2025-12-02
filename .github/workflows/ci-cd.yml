@@ -70,12 +70,20 @@ jobs:
           az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
+      - name: Debug: Test ACR login and image existence
+        run: |
+          echo "Testing ACR login with secrets..."
+          echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
+
+          echo "Listing images in ACR..."
+          az acr repository list --name ${{ secrets.ACR_NAME }} --output table
+
+          echo "Checking if the built image exists..."
+          docker pull "$IMAGE"
+
       - name: Deploy container to Azure Web App
         run: |
-          echo "IMAGE=$IMAGE"
-          echo "LOGIN_SERVER=$LOGIN_SERVER"
-
-          echo "Deploying container to Azure Web App with proper credentials"
+          echo "Deploying container to Azure Web App"
           az webapp config container set \
             --resource-group Hareesh_learning \
             --name "${{ secrets.WEBAPP_NAME }}" \
