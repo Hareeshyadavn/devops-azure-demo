@@ -1,7 +1,10 @@
-name: CI/CD - Build, Push, Deploy to Azure (debug)
+name: CI/CD - Build, Push, Deploy to Azure
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -15,25 +18,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug — check required secrets exist (will not reveal secret values)
-        shell: bash
+      - name: Azure CLI login (service principal)
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          missing=0
-          if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ]; then echo "ERROR: AZURE_CLIENT_ID is MISSING"; missing=1; else echo "AZURE_CLIENT_ID present"; fi
-          if [ -z "${{ secrets.AZURE_CLIENT_SECRET }}" ]; then echo "ERROR: AZURE_CLIENT_SECRET is MISSING"; missing=1; else echo "AZURE_CLIENT_SECRET present"; fi
-          if [ -z "${{ secrets.AZURE_TENANT_ID }}" ]; then echo "ERROR: AZURE_TENANT_ID is MISSING"; missing=1; else echo "AZURE_TENANT_ID present"; fi
-          if [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then echo "ERROR: AZURE_SUBSCRIPTION_ID is MISSING"; missing=1; else echo "AZURE_SUBSCRIPTION_ID present"; fi
-          if [ -z "${{ secrets.ACR_NAME }}" ]; then echo "ERROR: ACR_NAME is MISSING"; missing=1; else echo "ACR_NAME present"; fi
-          if [ -z "${{ secrets.WEBAPP_NAME }}" ]; then echo "ERROR: WEBAPP_NAME is MISSING"; missing=1; else echo "WEBAPP_NAME present"; fi
-          if [ "$missing" -eq 1 ]; then echo "One or more secrets are missing. Fix and re-run."; exit 1; fi
-
-      - name: Azure Login (service principal)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          echo "Logging in to Azure CLI using service principal"
+          az --version
+          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Login to ACR
         run: az acr login --name ${{ secrets.ACR_NAME }}
@@ -56,16 +51,21 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Azure Login (service principal)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure CLI login (service principal)
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          echo "Logging in to Azure CLI for deploy"
+          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Deploy container to App Service
-        uses: azure/webapps-container-deploy@v2
-        with:
-          app-name: ${{ secrets.WEBAPP_NAME }}
-          images: ${{ needs.build-and-push.outputs.image }}
+        run: |
+          az webapp deploy --resource-group Hareesh_learning --name "${{ secrets.WEBAPP_NAME }}" --src-path /dev/null || true
+          # Use the official deploy action if you prefer; here we use the CLI to set container:
+          LOGIN_SERVER="${{ secrets.ACR_NAME }}.azurecr.io"
+          az webapp config container set -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}" --docker-custom-image-name "$LOGIN_SERVER/devops-azure-demo:${{ github.sha }}" --docker-registry-server-url "https://$LOGIN_SERVER"
+          az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
