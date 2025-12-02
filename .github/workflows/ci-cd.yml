@@ -75,15 +75,15 @@ jobs:
         run: |
           LOGIN_SERVER="${{ secrets.ACR_NAME }}.azurecr.io"
 
-          echo "Setting container configuration on Web App"
+          echo "Configuring container (Linux App Service)"
 
           az webapp config container set \
             --resource-group Hareesh_learning \
             --name "${{ secrets.WEBAPP_NAME }}" \
-            --container-image-name "$IMAGE" \
-            --container-registry-url "https://$LOGIN_SERVER" \
-            --container-registry-username "${{ secrets.ACR_USERNAME }}" \
-            --container-registry-password "${{ secrets.ACR_PASSWORD }}"
+            --docker-custom-image-name "$IMAGE" \
+            --docker-registry-server-url "https://$LOGIN_SERVER" \
+            --docker-registry-server-user "${{ secrets.ACR_USERNAME }}" \
+            --docker-registry-server-password "${{ secrets.ACR_PASSWORD }}"
 
           echo "Restarting Web App..."
           az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
