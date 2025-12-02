@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.set-image.outputs.image }}
-    env:
-      ACR_NAME: ${{ secrets.ACR_NAME }}
 
     steps:
       - name: Checkout
@@ -35,7 +33,7 @@ jobs:
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Login to ACR
-        run: az acr login --name $ACR_NAME
+        run: az acr login --name ${{ secrets.ACR_NAME }}
 
       - name: Set up QEMU and buildx
         uses: docker/setup-buildx-action@v2
@@ -80,10 +78,8 @@ jobs:
         run: |
           echo "Testing ACR login with secrets..."
           echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
-
           echo "Listing images in ACR..."
           az acr repository list --name ${{ secrets.ACR_NAME }} --output table
-
           echo "Checking if the built image exists..."
           docker pull "$IMAGE"
 
