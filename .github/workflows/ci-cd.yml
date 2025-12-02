@@ -49,15 +49,9 @@ jobs:
         id: set-image
         run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
 
-
   deploy-to-appservice:
     needs: build-and-push
     runs-on: ubuntu-latest
-    env:
-      IMAGE: ${{ needs.build-and-push.outputs.image }}
-      LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
-      ACR_USER: ${{ secrets.ACR_USERNAME }}
-      ACR_PASS: ${{ secrets.ACR_PASSWORD }}
 
     steps:
       - name: Azure CLI login (service principal)
@@ -75,6 +69,11 @@ jobs:
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Debug: Test ACR login and image existence
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+          ACR_USER: ${{ secrets.ACR_USERNAME }}
+          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
         run: |
           echo "Testing ACR login with secrets..."
           echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
@@ -84,6 +83,11 @@ jobs:
           docker pull "$IMAGE"
 
       - name: Deploy container to Azure Web App
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+          ACR_USER: ${{ secrets.ACR_USERNAME }}
+          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
         run: |
           echo "Deploying container to Azure Web App"
           az webapp config container set \
