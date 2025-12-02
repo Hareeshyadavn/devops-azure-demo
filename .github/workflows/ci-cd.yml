@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
@@ -26,10 +25,7 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           echo "Logging into Azure"
-          az login --service-principal \
-            -u "$AZURE_CLIENT_ID" \
-            -p "$AZURE_CLIENT_SECRET" \
-            --tenant "$AZURE_TENANT_ID"
+          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Login to ACR
@@ -50,10 +46,17 @@ jobs:
         run: |
           IMAGE_TAG="${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}"
           echo "image=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Built image: $IMAGE_TAG"
 
   deploy-to-appservice:
     needs: build-and-push
     runs-on: ubuntu-latest
+
+    env:
+      IMAGE: ${{ needs.build-and-push.outputs.image }}
+      LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+      ACR_USER: ${{ secrets.ACR_USERNAME }}
+      ACR_PASS: ${{ secrets.ACR_PASSWORD }}
 
     steps:
       - name: Azure CLI login (service principal)
@@ -64,21 +67,15 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           echo "Logging into Azure for deployment"
-          az login --service-principal \
-            -u "$AZURE_CLIENT_ID" \
-            -p "$AZURE_CLIENT_SECRET" \
-            --tenant "$AZURE_TENANT_ID"
+          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Deploy container to Azure Web App
-        env:
-          IMAGE: ${{ needs.build-and-push.outputs.image }}
-          LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
-          ACR_USER: ${{ secrets.ACR_USERNAME }}
-          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
         run: |
-          echo "Deploying container to Azure Web App"
+          echo "IMAGE=$IMAGE"
+          echo "LOGIN_SERVER=$LOGIN_SERVER"
 
+          echo "Deploying container to Azure Web App with proper credentials"
           az webapp config container set \
             --resource-group Hareesh_learning \
             --name "${{ secrets.WEBAPP_NAME }}" \
