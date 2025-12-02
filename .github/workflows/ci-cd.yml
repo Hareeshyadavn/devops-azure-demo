@@ -2,18 +2,18 @@ name: CI/CD - Build, Push, Deploy to Azure
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
+
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.set-image.outputs.image }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,9 +25,11 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          echo "Logging in to Azure CLI using service principal"
-          az --version
-          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          echo "Logging into Azure"
+          az login --service-principal \
+            -u "$AZURE_CLIENT_ID" \
+            -p "$AZURE_CLIENT_SECRET" \
+            --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Login to ACR
@@ -47,9 +49,11 @@ jobs:
         id: set-image
         run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
 
+
   deploy-to-appservice:
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
       - name: Azure CLI login (service principal)
         env:
@@ -58,14 +62,28 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          echo "Logging in to Azure CLI for deploy"
-          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          echo "Logging into Azure for deployment"
+          az login --service-principal \
+            -u "$AZURE_CLIENT_ID" \
+            -p "$AZURE_CLIENT_SECRET" \
+            --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
-      - name: Deploy container to App Service
+      - name: Deploy container to Azure Web App
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
-          az webapp deploy --resource-group Hareesh_learning --name "${{ secrets.WEBAPP_NAME }}" --src-path /dev/null || true
-          # Use the official deploy action if you prefer; here we use the CLI to set container:
           LOGIN_SERVER="${{ secrets.ACR_NAME }}.azurecr.io"
-          az webapp config container set -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}" --docker-custom-image-name "$LOGIN_SERVER/devops-azure-demo:${{ github.sha }}" --docker-registry-server-url "https://$LOGIN_SERVER"
+
+          echo "Setting container configuration on Web App"
+
+          az webapp config container set \
+            --resource-group Hareesh_learning \
+            --name "${{ secrets.WEBAPP_NAME }}" \
+            --container-image-name "$IMAGE" \
+            --container-registry-url "https://$LOGIN_SERVER" \
+            --container-registry-username "${{ secrets.ACR_USERNAME }}" \
+            --container-registry-password "${{ secrets.ACR_PASSWORD }}"
+
+          echo "Restarting Web App..."
           az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
