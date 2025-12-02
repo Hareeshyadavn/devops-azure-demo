@@ -8,10 +8,13 @@ on:
   workflow_dispatch:
 
 jobs:
+
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.set-image.outputs.image }}
+    env:
+      ACR_NAME: ${{ secrets.ACR_NAME }}
 
     steps:
       - name: Checkout
@@ -25,11 +28,14 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           echo "Logging into Azure"
-          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          az login --service-principal \
+            -u "$AZURE_CLIENT_ID" \
+            -p "$AZURE_CLIENT_SECRET" \
+            --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Login to ACR
-        run: az acr login --name ${{ secrets.ACR_NAME }}
+        run: az acr login --name $ACR_NAME
 
       - name: Set up QEMU and buildx
         uses: docker/setup-buildx-action@v2
@@ -43,15 +49,12 @@ jobs:
 
       - name: Set image tag output
         id: set-image
-        run: |
-          IMAGE_TAG="${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}"
-          echo "image=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "Built image: $IMAGE_TAG"
+        run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
+
 
   deploy-to-appservice:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     env:
       IMAGE: ${{ needs.build-and-push.outputs.image }}
       LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
@@ -67,7 +70,10 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           echo "Logging into Azure for deployment"
-          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          az login --service-principal \
+            -u "$AZURE_CLIENT_ID" \
+            -p "$AZURE_CLIENT_SECRET" \
+            --tenant "$AZURE_TENANT_ID"
           az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
       - name: Debug: Test ACR login and image existence
