@@ -2,18 +2,18 @@ name: CI/CD - Build, Push, Deploy to Azure
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.set-image.outputs.image }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,10 +92,13 @@ jobs:
           LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
           ACR_USER: ${{ secrets.ACR_USERNAME }}
           ACR_PASS: ${{ secrets.ACR_PASSWORD }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
         run: |
           echo "Testing ACR login with secrets..."
           echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
+
           echo "Listing repositories in ACR..."
-          az acr repository list --name ${{ secrets.ACR_NAME }} --output table
+          az acr repository list --name "$ACR_NAME" --output table
+
           echo "Pulling the built image..."
           docker pull "$IMAGE"
