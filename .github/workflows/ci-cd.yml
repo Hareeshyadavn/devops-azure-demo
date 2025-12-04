@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Azure CLI login (service principal)
+      - name: Azure CLI login
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -41,14 +41,15 @@ jobs:
       - name: Set up QEMU and buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build and push Docker image to ACR
+      - name: Build and push Docker image
+        id: dockerbuild
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}
 
-      - name: Set image tag output
+      - name: Set image output
         id: set-image
         run: echo "image=${{ secrets.ACR_NAME }}.azurecr.io/devops-azure-demo:${{ github.sha }}" >> $GITHUB_OUTPUT
 
@@ -56,7 +57,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Azure CLI login (service principal)
+      - name: Azure CLI login
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -89,10 +90,10 @@ jobs:
           echo "Restarting Web App..."
           az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
 
-      - name: Print IMAGE value
+      - name: Print deployed image
         run: echo "IMAGE = '${{ needs.build-and-push.outputs.image }}'"
-        
-      - name: Debug:Test ACR login and image existence
+
+      - name: Debug: Test ACR login and image existence
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
           LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
@@ -100,7 +101,7 @@ jobs:
           ACR_PASS: ${{ secrets.ACR_PASSWORD }}
           ACR_NAME: ${{ secrets.ACR_NAME }}
         run: |
-          echo "Testing ACR login with secrets..."
+          echo "Testing ACR login..."
           echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
           echo "Listing repositories in ACR..."
           az acr repository list --name "$ACR_NAME" --output table
