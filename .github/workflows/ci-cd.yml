@@ -96,9 +96,7 @@ jobs:
         run: |
           echo "Testing ACR login with secrets..."
           echo "$ACR_PASS" | docker login $LOGIN_SERVER -u "$ACR_USER" --password-stdin
-
           echo "Listing repositories in ACR..."
           az acr repository list --name "$ACR_NAME" --output table
-
           echo "Pulling the built image..."
           docker pull "$IMAGE"
