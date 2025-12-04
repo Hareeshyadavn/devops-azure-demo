@@ -86,6 +86,9 @@ jobs:
           echo "Restarting Web App..."
           az webapp restart -g Hareesh_learning -n "${{ secrets.WEBAPP_NAME }}"
 
+      - name: Print IMAGE value
+        run: echo "IMAGE = '${{ needs.build-and-push.outputs.image }}'"
+        
       - name: Debug:Test ACR login and image existence
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
